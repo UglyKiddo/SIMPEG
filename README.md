@@ -1,0 +1,29 @@
+# SIMPEG PN Yogyakarta
+
+**SIMPEG PN Yogyakarta** adalah Sistem Informasi Manajemen Kepegawaian untuk mengelola data hakim dan pegawai Pengadilan Negeri Yogyakarta. Aplikasi menggunakan PHP native dan MySQL/MariaDB melalui PDO.
+
+Kebutuhan: PHP 7.4+ dengan ekstensi `pdo_mysql`, `mbstring`, dan `fileinfo`, serta MySQL/MariaDB.
+
+## Fitur
+
+- Daftar umum hakim dan pegawai, pencarian nama/NIP, filter berdasarkan bulan TMT, pangkat/golongan, pendidikan, jabatan, serta kelompok, pengurutan kolom, pengeditan data pegawai, dan pengaturan jumlah data yang ditampilkan (25, 50, 100, atau semua).
+- Input data pegawai, pencatatan promosi, serta pencatatan mutasi/pindah dengan beberapa lampiran foto atau dokumen.
+- Pembuatan akun pengguna tambahan dengan role Pengelola Kepegawaian yang sama.
+- Rekap promosi dan mutasi dengan filter bulan, triwulan, dan tahun berdasarkan tanggal SK; tanggal SK ditampilkan bersama nama harinya. Setiap baris dapat diedit atau dihapus. Perubahan jabatan/pangkat atau status pegawai mengikuti transaksi terkait hanya jika tidak ada transaksi berikutnya yang mengubah atribut tersebut; penghapusan juga menghapus metadata lampiran terkait.
+- Login dengan satu role tetap, **Pengelola Kepegawaian**. Tidak ada role Admin atau Penilai.
+
+## Instalasi lokal (XAMPP)
+
+1. Salin folder aplikasi ke `htdocs`.
+2. Impor dump database yang Anda sediakan (`pn_yogya.sql`) ke database `pn_yogya`.
+3. Pilih database `pn_yogya` di phpMyAdmin, buka tab **Import**, lalu jalankan file `database.sql` dari folder aplikasi **satu kali**. File ini adalah migrasi tambahan untuk menghubungkan login NIP, menyimpan TMT, dan merekam snapshot jabatan/pangkat pada riwayat; file ini tidak menghapus data.
+4. Untuk menyimpan nilai baru dari pilihan Pendidikan **Lainnya**, impor `database_pendidikan_custom.sql` satu kali pada database yang sama. Migrasi ini mempertahankan data dan mengubah kolom pendidikan agar menerima nilai khusus.
+5. Untuk mengaktifkan beberapa lampiran promosi/mutasi pada database dari dump `pn_yogya (1).sql`, impor `database_lampiran.sql` satu kali agar indeks unik lama di tabel lampiran menjadi indeks biasa. Pastikan PHP dapat menulis ke folder `simpeg-pn-yogya-storage/lampiran-transaksi` di atas folder `htdocs`; file disimpan di luar document root agar tidak dapat diakses langsung.
+6. Pastikan konfigurasi PHP mengizinkan unggahan beberapa file (misalnya `upload_max_filesize=5M`, `post_max_size=55M`, dan `max_file_uploads=10`).
+7. Jika pengaturan MySQL berbeda dari XAMPP default, sesuaikan host, nama database, username, dan password di `includes/config.php`.
+8. Buka aplikasi melalui `http://localhost/sistem-pn-yogya/`.
+9. Pada kunjungan pertama, buka aplikasi melalui browser di mesin server untuk mengakses halaman setup dan membuat akun pengelola menggunakan NIP 18 digit serta kata sandi pilihan Anda. Halaman setup menolak koneksi selain localhost. Akun bawaan `admin` dalam dump lama tidak dihapus; login aplikasi menggunakan akun yang memiliki NIP.
+
+Lampiran menerima JPG, PNG, WEBP, PDF, DOC, DOCX, XLS, dan XLSX; maksimal 10 file dengan ukuran 5 MB per file untuk setiap transaksi.
+
+Tidak ada username atau kata sandi bawaan. Kata sandi akun disimpan sebagai hash.
