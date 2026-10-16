@@ -5,7 +5,7 @@ function tidak_ada_perubahan_riwayat_setelah($pegawaiId, $tipe, $transaksiId)
 
     $tabel = $tipe === 'promosi' ? 'riwayat_promosi' : 'riwayat_mutasi';
     $kolomId = $tipe === 'promosi' ? 'id_promosi' : 'id_mutasi';
-    $kondisiMutasi = $tipe === 'mutasi' ? " AND jenis_mutasi <> 'Internal'" : '';
+    $kondisiMutasi = $tipe === 'mutasi' ? " AND sesudah.jenis_mutasi <> 'Internal'" : '';
     $statement = $pdo->prepare(
         "SELECT NOT EXISTS (
              SELECT 1
