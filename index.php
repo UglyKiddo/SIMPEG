@@ -101,6 +101,7 @@ $sql = 'SELECT
         p.nama_lengkap AS nama,
         p.nip,
         pg.golongan,
+        pg.nama_pangkat,
         p.pendidikan_terakhir AS pendidikan,
         j.nama_jabatan AS jabatan,
         p.tmt,
@@ -278,7 +279,10 @@ include 'includes/header.php';
                         <td><div class="nm"><?= e($row['nama']) ?></div></td>
                         <td><?= e($row['nip']) ?></td>
                         <td><?= e($row['jabatan'] ?? '-') ?></td>
-                        <td><?= e($row['golongan'] ?? '-') ?></td>
+                        <td>
+                            <?= e($row['nama_pangkat'] ?? '-') ?>
+                            <?= !empty($row['golongan']) ? ' (' . e($row['golongan']) . ')' : '' ?>
+                        </td>
                         <td><?= e($row['pendidikan'] ?? '-') ?></td>
                         <td><?= tgl_id($row['tmt']) ?></td>
                         <td>
