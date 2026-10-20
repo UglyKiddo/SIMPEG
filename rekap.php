@@ -405,7 +405,9 @@ include 'includes/header.php';
                                 >Edit</a>
                                 <form
                                     method="post"
-                                    onsubmit="return confirm('Hapus riwayat ini? Jika merupakan transaksi terakhir, data pegawai akan dikembalikan ke kondisi sebelumnya.')"
+                                    data-confirm-title="Yakin ingin menghapus riwayat?"
+                                    data-confirm-message="Jika ini transaksi terakhir, data pegawai akan dikembalikan ke kondisi sebelumnya."
+                                    data-confirm-button="Ya, Hapus"
                                 >
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="tipe" value="<?= e($tipe) ?>">

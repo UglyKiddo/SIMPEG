@@ -7,23 +7,27 @@
     </div>
 
     <div class="sidebar-overlay" hidden></div>
-    <dialog class="logout-dialog" aria-labelledby="logout-dialog-title" aria-describedby="logout-dialog-description">
-        <div class="logout-dialog-icon" aria-hidden="true">?</div>
-        <h2 id="logout-dialog-title">Yakin ingin keluar?</h2>
-        <p id="logout-dialog-description">Sesi Anda akan diakhiri.</p>
-        <div class="logout-dialog-actions">
-            <button class="logout-dialog-confirm" type="button">Ya, Keluar</button>
-            <button class="logout-dialog-cancel" type="button">Batal</button>
+    <dialog class="confirmation-dialog" aria-labelledby="confirmation-dialog-title" aria-describedby="confirmation-dialog-description">
+        <div class="confirmation-dialog-icon" aria-hidden="true">?</div>
+        <h2 id="confirmation-dialog-title"></h2>
+        <p id="confirmation-dialog-description"></p>
+        <div class="confirmation-dialog-actions">
+            <button class="confirmation-dialog-confirm" type="button"></button>
+            <button class="confirmation-dialog-cancel" type="button">Batal</button>
         </div>
     </dialog>
     <script>
         const sidebar = document.querySelector('.sidebar');
         const sidebarToggle = document.querySelector('.sidebar-toggle');
         const sidebarOverlay = document.querySelector('.sidebar-overlay');
-        const logoutForm = document.querySelector('.logout');
-        const logoutDialog = document.querySelector('.logout-dialog');
-        const logoutConfirm = document.querySelector('.logout-dialog-confirm');
-        const logoutCancel = document.querySelector('.logout-dialog-cancel');
+        const confirmationDialog = document.querySelector('.confirmation-dialog');
+        const confirmationTitle = document.querySelector('#confirmation-dialog-title');
+        const confirmationDescription = document.querySelector('#confirmation-dialog-description');
+        const confirmationConfirm = document.querySelector('.confirmation-dialog-confirm');
+        const confirmationCancel = document.querySelector('.confirmation-dialog-cancel');
+        let pendingForm = null;
+        let pendingSubmitter = null;
+        let approvedForm = null;
 
         function toggleSidebar(open) {
             sidebar.classList.toggle('is-open', open);
@@ -36,14 +40,50 @@
         });
         sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
 
-        logoutForm.addEventListener('submit', (event) => {
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) return;
+            if (approvedForm === form) {
+                approvedForm = null;
+                return;
+            }
+
+            const submitter = event.submitter || null;
+            const confirmation = submitter && submitter.dataset.confirmTitle
+                ? submitter
+                : form;
+            if (!confirmation.dataset.confirmTitle) return;
+
             event.preventDefault();
-            logoutDialog.showModal();
+            pendingForm = form;
+            pendingSubmitter = submitter;
+            confirmationTitle.textContent = confirmation.dataset.confirmTitle;
+            confirmationDescription.textContent = confirmation.dataset.confirmMessage || '';
+            confirmationConfirm.textContent = confirmation.dataset.confirmButton || 'Ya, Lanjutkan';
+            confirmationDialog.showModal();
         });
-        logoutConfirm.addEventListener('click', () => logoutForm.submit());
-        logoutCancel.addEventListener('click', () => logoutDialog.close());
-        logoutDialog.addEventListener('click', (event) => {
-            if (event.target === logoutDialog) logoutDialog.close();
+
+        confirmationConfirm.addEventListener('click', () => {
+            if (!pendingForm) return;
+            const form = pendingForm;
+            const submitter = pendingSubmitter;
+            pendingForm = null;
+            pendingSubmitter = null;
+            approvedForm = form;
+            confirmationDialog.close();
+            if (submitter) {
+                form.requestSubmit(submitter);
+            } else {
+                form.requestSubmit();
+            }
+        });
+        confirmationCancel.addEventListener('click', () => confirmationDialog.close());
+        confirmationDialog.addEventListener('click', (event) => {
+            if (event.target === confirmationDialog) confirmationDialog.close();
+        });
+        confirmationDialog.addEventListener('close', () => {
+            pendingForm = null;
+            pendingSubmitter = null;
         });
     </script>
 </body>

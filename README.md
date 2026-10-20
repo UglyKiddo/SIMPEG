@@ -9,6 +9,7 @@ Kebutuhan: PHP 7.4+ dengan ekstensi `pdo_mysql`, `mbstring`, dan `fileinfo`, ser
 - Daftar umum hakim dan pegawai, pencarian nama/NIP, filter berdasarkan bulan TMT, pangkat/golongan, pendidikan, jabatan, serta kelompok, pengurutan kolom, pengeditan data pegawai, dan pengaturan jumlah data yang ditampilkan (25, 50, 100, atau semua).
 - Input data pegawai, pencatatan promosi, serta pencatatan mutasi/pindah dengan beberapa lampiran foto atau dokumen.
 - Pembuatan akun pengguna tambahan dengan role Pengelola Kepegawaian yang sama.
+- Menu Presentasi Canva untuk mengatur tautan dan menampilkan presentasi data pegawai yang dibuat di Canva. Isi presentasi dikelola di Canva dan tidak tersinkron otomatis dengan database SIMPEG.
 - Rekap promosi dan mutasi dengan filter bulan, triwulan, dan tahun berdasarkan tanggal SK; tanggal SK ditampilkan bersama nama harinya. Setiap baris dapat diedit atau dihapus. Perubahan jabatan/pangkat atau status pegawai mengikuti transaksi terkait hanya jika tidak ada transaksi berikutnya yang mengubah atribut tersebut; penghapusan juga menghapus metadata lampiran terkait.
 - Login dengan satu role tetap, **Pengelola Kepegawaian**. Tidak ada role Admin atau Penilai.
 
@@ -25,5 +26,7 @@ Kebutuhan: PHP 7.4+ dengan ekstensi `pdo_mysql`, `mbstring`, dan `fileinfo`, ser
 9. Pada kunjungan pertama, buka aplikasi melalui browser di mesin server untuk mengakses halaman setup dan membuat akun pengelola menggunakan NIP 18 digit serta kata sandi pilihan Anda. Halaman setup menolak koneksi selain localhost. Akun bawaan `admin` dalam dump lama tidak dihapus; login aplikasi menggunakan akun yang memiliki NIP.
 
 Lampiran menerima JPG, PNG, WEBP, PDF, DOC, DOCX, XLS, dan XLSX; maksimal 10 file dengan ukuran 5 MB per file untuk setiap transaksi.
+
+Tautan presentasi diatur melalui menu **Presentasi Canva** setelah login. Gunakan tautan tampilan desain Canva (`https://www.canva.com/design/.../view`) dan pastikan izin berbagi Canva mengizinkan pengguna SIMPEG melihat presentasi. Aplikasi menyimpan pengaturan ini di folder `simpeg-pn-yogya-storage/pengaturan` di atas folder `htdocs`; pastikan folder penyimpanan tersebut dapat ditulis oleh PHP.
 
 Tidak ada username atau kata sandi bawaan. Kata sandi akun disimpan sebagai hash.

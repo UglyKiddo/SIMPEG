@@ -295,11 +295,13 @@ include 'includes/header.php';
                                 <a class="btn edit" href="edit.php?id=<?= (int) $row['id'] ?>">Edit</a>
                                 <form
                                     method="post"
-                                    onsubmit="return confirm('Hapus data pegawai ini beserta riwayatnya?')"
+                                    data-confirm-title="Yakin ingin menghapus data pegawai?"
+                                    data-confirm-message="Data pegawai beserta riwayatnya akan dihapus."
+                                    data-confirm-button="Ya, Hapus"
                                 >
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="hapus" value="<?= $row['id'] ?>">
-                                    <button class="btn g">Hapus</button>
+                                    <button class="btn g" type="submit">Hapus</button>
                                 </form>
                             </div>
                         </td>
