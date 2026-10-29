@@ -120,40 +120,53 @@ $stats = $pdo->query(
         (SELECT COUNT(*) FROM riwayat_promosi) AS promosi,
         (SELECT COUNT(*) FROM riwayat_mutasi) AS mutasi"
 )->fetch();
+$statsJabatan = $pdo->query(
+    "SELECT CASE
+                WHEN j.kategori = 'Hakim' THEN 'Hakim'
+                WHEN j.kategori = 'PPNPN' THEN 'PPNPN'
+                WHEN j.nama_jabatan LIKE 'Panitera%' THEN 'Panitera'
+                WHEN j.nama_jabatan LIKE 'Juru Sita%' THEN 'Juru Sita'
+                WHEN j.nama_jabatan = 'Sekretaris'
+                  OR j.nama_jabatan LIKE '%Kepala Sub Bagian%' THEN 'Kesekretariatan'
+                WHEN j.kategori = 'Pegawai' THEN 'Fungsional/Pelaksana'
+                ELSE 'Lainnya'
+            END AS kategori,
+            COUNT(p.id_pegawai) AS jumlah
+     FROM pegawai p
+     LEFT JOIN jabatan j ON j.id_jabatan = p.id_jabatan
+     WHERE p.status_aktif = 'Aktif'
+     GROUP BY 1
+     ORDER BY FIELD(kategori, 'Hakim', 'Panitera', 'Juru Sita', 'Kesekretariatan',
+                    'Fungsional/Pelaksana', 'PPNPN', 'Lainnya')"
+)->fetchAll();
 
 $judul = 'Daftar pegawai';
 include 'includes/header.php';
 ?>
 
-<div class="stats">
+<div class="stats dashboard-stats">
     <div>
         <b><?= $stats['aktif'] ?></b>
         <span>Pegawai aktif</span>
-        <svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M16 11a3 3 0 1 0-2.9-3.8 5 5 0 0 1 0 7.6A3 3 0 0 0 16 11ZM8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V20h12v-2.2C14 15.7 11.3 14 8 14Zm8 .2c-.7 0-1.3.1-1.9.2 1.2.9 1.9 2.1 1.9 3.6v2h6v-2.2c0-2-2.7-3.6-6-3.6Z"/>
-        </svg>
     </div>
     <div>
         <b><?= $stats['hakim'] ?></b>
         <span>Hakim aktif</span>
-        <svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 2 3 6v2h18V6l-9-4ZM5 10h2v8H5v-8Zm6 0h2v8h-2v-8Zm6 0h2v8h-2v-8ZM3 20h18v2H3v-2Z"/>
-        </svg>
     </div>
     <div>
         <b><?= $stats['promosi'] ?></b>
         <span>Promosi tercatat</span>
-        <svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m12 2 2.4 6.1L21 10l-5 4.1.3 6.6-4.3-3.7-4.3 3.7.3-6.6L3 10l6.6-1.9L12 2Zm7 15 1.1 2.2L22 20l-1.9.8L19 23l-1.1-2.2L16 20l1.9-.8L19 17Z"/>
-        </svg>
     </div>
     <div>
         <b><?= $stats['mutasi'] ?></b>
         <span>Mutasi tercatat</span>
-        <svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m7 3-4 4 4 4V8h10a3 3 0 0 1 3 3h2a5 5 0 0 0-5-5H7V3Zm10 18 4-4-4-4v3H7a3 3 0 0 1-3-3H2a5 5 0 0 0 5 5h10v3Z"/>
-        </svg>
     </div>
+    <?php foreach ($statsJabatan as $kategoriStat): ?>
+        <div>
+            <b><?= (int) $kategoriStat['jumlah'] ?></b>
+            <span><?= e($kategoriStat['kategori']) ?></span>
+        </div>
+    <?php endforeach; ?>
 </div>
 
 <div class="card">

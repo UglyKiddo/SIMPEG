@@ -31,6 +31,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['hapus_riwayat'])) {
         if (!$riwayatHapus) {
             throw new RuntimeException('Riwayat tidak ditemukan.');
         }
+        if (
+            $tipeHapus === 'promosi'
+            && $riwayatHapus['jenis_promosi'] === 'Keluar'
+        ) {
+            throw new RuntimeException(
+                'Riwayat pegawai keluar tidak dapat dihapus karena data pegawai sudah dihapus.'
+            );
+        }
 
         $pegawaiIdHapus = (int) $riwayatHapus['id_pegawai'];
         if (tidak_ada_perubahan_riwayat_setelah($pegawaiIdHapus, $tipeHapus, $idHapus)) {
@@ -149,24 +157,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['hapus_riwayat'])) {
 $params = [];
 
 if ($tipe === 'promosi') {
-    $sql = 'SELECT r.id_promosi AS id, r.id_pegawai, r.no_sk, r.tanggal_sk, r.tujuan, r.keterangan,
-                p.nama_lengkap AS nama, p.nip,
+    $sql = 'SELECT r.id_promosi AS id, r.id_pegawai, r.jenis_promosi, r.tanggal_keluar,
+                r.no_sk, r.tanggal_sk, r.tujuan, r.keterangan,
+                COALESCE(p.nama_lengkap, r.nama_pegawai, CONCAT(\'Pegawai #\', r.id_pegawai)) AS nama,
+                COALESCE(p.nip, r.nip_pegawai, \'-\') AS nip,
                 j_lama.nama_jabatan AS jabatan_lama,
                 pg_lama.golongan AS golongan_lama,
                 j_baru.nama_jabatan AS jabatan_baru,
                 pg_baru.golongan AS golongan_baru
             FROM riwayat_promosi r
-            JOIN pegawai p ON p.id_pegawai = r.id_pegawai
+            LEFT JOIN pegawai p ON p.id_pegawai = r.id_pegawai
             LEFT JOIN jabatan j_lama ON j_lama.id_jabatan = r.id_jabatan_lama
             LEFT JOIN pangkat_golongan pg_lama ON pg_lama.id_pangkat = r.id_pangkat_lama
-            JOIN jabatan j_baru ON j_baru.id_jabatan = r.id_jabatan_baru
+            LEFT JOIN jabatan j_baru ON j_baru.id_jabatan = r.id_jabatan_baru
             LEFT JOIN pangkat_golongan pg_baru ON pg_baru.id_pangkat = r.id_pangkat_baru';
 } else {
-    $sql = 'SELECT r.id_mutasi AS id, r.id_pegawai, r.no_sk, r.tanggal_sk, r.jenis_mutasi, r.tujuan, r.keterangan,
-                p.nama_lengkap AS nama, p.nip,
+    $sql = 'SELECT r.id_mutasi AS id, r.id_pegawai, r.no_sk, r.tanggal_sk, r.tanggal_keluar,
+                r.jenis_mutasi, r.tujuan, r.keterangan,
+                COALESCE(p.nama_lengkap, r.nama_pegawai, CONCAT(\'Pegawai #\', r.id_pegawai)) AS nama,
+                COALESCE(p.nip, r.nip_pegawai, \'-\') AS nip,
                 j.nama_jabatan AS jabatan_lama, pg.golongan AS golongan_lama
             FROM riwayat_mutasi r
-            JOIN pegawai p ON p.id_pegawai = r.id_pegawai
+            LEFT JOIN pegawai p ON p.id_pegawai = r.id_pegawai
             LEFT JOIN jabatan j ON j.id_jabatan = r.id_jabatan_saat_mutasi
             LEFT JOIN pangkat_golongan pg ON pg.id_pangkat = r.id_pangkat_saat_mutasi';
 }
@@ -326,13 +338,14 @@ include 'includes/header.php';
                     <?php if ($isPromosi): ?>
                         <th>Nomor SK</th>
                         <th>Hari/tanggal</th>
-                        <th>Dari</th>
-                        <th>Menjadi</th>
+                        <th>Jabatan lama</th>
+                        <th>Jabatan baru</th>
                         <th>Tujuan</th>
                         <th>Keterangan</th>
                     <?php else: ?>
                         <th>Nomor SK</th>
                         <th>Hari/tanggal</th>
+                        <th>Tanggal keluar</th>
                         <th>Jenis mutasi</th>
                         <th>Jabatan/golongan</th>
                         <th>Tujuan</th>
@@ -345,7 +358,7 @@ include 'includes/header.php';
             <tbody>
                 <?php if (!$rows): ?>
                     <tr>
-                        <td colspan="10" class="em">
+                        <td colspan="<?= $isPromosi ? 10 : 11 ?>" class="em">
                             Belum ada data<?= $labelPeriode !== '' ? ' untuk ' . e($labelPeriode) : '' ?>.
                         </td>
                     </tr>
@@ -367,13 +380,18 @@ include 'includes/header.php';
                             </td>
                             <td>
                                 <?= e($row['golongan_baru'] ?? '-') ?>
-                                <div class="sub"><?= e($row['jabatan_baru']) ?></div>
+                                <?php if ($row['jenis_promosi'] === 'Keluar'): ?>
+                                    <div class="sub">Keluar <?= e(tgl_id($row['tanggal_keluar'] ?? null)) ?></div>
+                                <?php else: ?>
+                                    <div class="sub"><?= e($row['jabatan_baru'] ?? '-') ?></div>
+                                <?php endif; ?>
                             </td>
                             <td><?= e($row['tujuan']) ?></td>
                             <td><?= $row['keterangan'] !== null && $row['keterangan'] !== '' ? nl2br(e($row['keterangan'])) : '-' ?></td>
                         <?php else: ?>
                             <td><?= e($row['no_sk']) ?></td>
                             <td><?= e(tgl_id($row['tanggal_sk'])) ?></td>
+                            <td><?= e(tgl_id($row['tanggal_keluar'] ?? null)) ?></td>
                             <td><?= e($row['jenis_mutasi']) ?></td>
                             <td>
                                 <?= e($row['golongan_lama'] ?? '-') ?>
@@ -403,17 +421,19 @@ include 'includes/header.php';
                                     class="btn edit"
                                     href="edit_riwayat.php?tipe=<?= e($tipe) ?>&amp;id=<?= (int) $row['id'] ?>"
                                 >Edit</a>
-                                <form
-                                    method="post"
-                                    data-confirm-title="Yakin ingin menghapus riwayat?"
-                                    data-confirm-message="Jika ini transaksi terakhir, data pegawai akan dikembalikan ke kondisi sebelumnya."
-                                    data-confirm-button="Ya, Hapus"
-                                >
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="tipe" value="<?= e($tipe) ?>">
-                                    <input type="hidden" name="hapus_riwayat" value="<?= (int) $row['id'] ?>">
-                                    <button class="btn g" type="submit">Hapus</button>
-                                </form>
+                                <?php if (!$isPromosi || $row['jenis_promosi'] !== 'Keluar'): ?>
+                                    <form
+                                        method="post"
+                                        data-confirm-title="Yakin ingin menghapus riwayat?"
+                                        data-confirm-message="Jika ini transaksi terakhir, data pegawai akan dikembalikan ke kondisi sebelumnya."
+                                        data-confirm-button="Ya, Hapus"
+                                    >
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="tipe" value="<?= e($tipe) ?>">
+                                        <input type="hidden" name="hapus_riwayat" value="<?= (int) $row['id'] ?>">
+                                        <button class="btn g" type="submit">Hapus</button>
+                                    </form>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>

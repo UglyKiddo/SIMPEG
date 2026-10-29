@@ -14,7 +14,6 @@ function side_icon($name)
         'transfer' => '<path d="M4 8h15l-3-3m4 11H5l3 3"/>',
         'report' => '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7m-7 4h7"/>',
         'presentation' => '<rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21l4-4 4 4M12 17v4M7 9h4m2 0h4m-10 4h10"/>',
-        'account' => '<circle cx="9" cy="8" r="3"/><path d="M3 20c.4-3.2 2.3-5 6-5 2 0 3.5.6 4.5 1.7"/><path d="m18 13 .8 1.6 1.7.3-1.2 1.2.3 1.7-1.6-.8-1.6.8.3-1.7-1.2-1.2 1.7-.3z"/>',
         'logout' => '<path d="M10 5H5v14h5m4-4 4-3-4-3m4 3H9"/>',
     ];
 
@@ -67,11 +66,6 @@ function nav($url, $label, $icon, $active)
         <div class="side-section">
             <span class="side-heading">INTEGRASI</span>
             <?= nav('canva.php', 'Presentasi Canva', 'presentation', $hal === 'canva') ?>
-        </div>
-
-        <div class="side-section">
-            <span class="side-heading">PENGELOLAAN AKUN</span>
-            <?= nav('akun.php', 'Tambah akun', 'account', $hal === 'akun') ?>
         </div>
 
         <div class="side-section side-account">

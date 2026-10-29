@@ -13,9 +13,11 @@ if (!in_array($tipe, ['promosi', 'mutasi'], true) || !$id || $id < 1) {
 $tabel = $tipe === 'promosi' ? 'riwayat_promosi' : 'riwayat_mutasi';
 $kolomId = $tipe === 'promosi' ? 'id_promosi' : 'id_mutasi';
 $statement = $pdo->prepare(
-    "SELECT r.*, p.nama_lengkap, p.nip
+    "SELECT r.*,
+            COALESCE(p.nama_lengkap, r.nama_pegawai, CONCAT('Pegawai #', r.id_pegawai)) AS nama_lengkap,
+            COALESCE(p.nip, r.nip_pegawai, '-') AS nip
      FROM $tabel r
-     JOIN pegawai p ON p.id_pegawai = r.id_pegawai
+     LEFT JOIN pegawai p ON p.id_pegawai = r.id_pegawai
      WHERE r.$kolomId = ?"
 );
 $statement->execute([$id]);
@@ -28,9 +30,12 @@ if (!$riwayat) {
 $jabatanList = daftar_jabatan();
 $pangkatList = daftar_pangkat();
 $jenisMutasiPilihan = ['Masuk', 'Keluar', 'Internal'];
+$jenisPromosiPilihan = ['Naik Jabatan', 'Keluar'];
 $v = [
     'no_sk' => $riwayat['no_sk'] ?? '',
     'tanggal_sk' => $riwayat['tanggal_sk'] ?? '',
+    'tanggal_keluar' => $riwayat['tanggal_keluar'] ?? '',
+    'jenis_promosi' => $riwayat['jenis_promosi'] ?? 'Naik Jabatan',
     'tujuan' => $riwayat['tujuan'] ?? '',
     'keterangan' => $riwayat['keterangan'] ?? '',
     'jenis_mutasi' => $riwayat['jenis_mutasi'] ?? '',
@@ -61,12 +66,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $inputValid = $v['no_sk'] !== ''
         && mb_strlen($v['no_sk']) <= 100
         && valid_date($v['tanggal_sk'])
+        && (
+            ($tipe !== 'mutasi' || $v['jenis_mutasi'] !== 'Keluar' || valid_date($v['tanggal_keluar']))
+            && ($tipe !== 'promosi' || $v['jenis_promosi'] !== 'Keluar' || valid_date($v['tanggal_keluar']))
+        )
         && $v['tujuan'] !== ''
         && mb_strlen($v['tujuan']) <= 255
         && mb_strlen($v['keterangan']) <= 5000
         && (
             $tipe === 'promosi'
-                ? ($jabatanValid && $pangkatValid)
+                ? (
+                    in_array($v['jenis_promosi'], $jenisPromosiPilihan, true)
+                    && $v['jenis_promosi'] === $riwayat['jenis_promosi']
+                    && (
+                        $v['jenis_promosi'] === 'Keluar'
+                            ? true
+                            : ($jabatanValid && $pangkatValid)
+                    )
+                )
                 : in_array($v['jenis_mutasi'], $jenisMutasiPilihan, true)
         );
 
@@ -88,64 +105,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $terakhir = tidak_ada_perubahan_riwayat_setelah((int) $lama['id_pegawai'], $tipe, $id);
             if ($tipe === 'promosi') {
-                $jabatanBaru = (int) $v['id_jabatan_baru'];
-                $pangkatBaru = $v['id_pangkat_baru'] === ''
-                    ? null
-                    : (int) $v['id_pangkat_baru'];
-                $tujuanBerubah = $jabatanBaru !== (int) $lama['id_jabatan_baru']
-                    || (
-                        $pangkatBaru === null
-                            ? $lama['id_pangkat_baru'] !== null
-                            : (int) $lama['id_pangkat_baru'] !== $pangkatBaru
+                if ($lama['jenis_promosi'] === 'Keluar') {
+                    $update = $pdo->prepare(
+                        'UPDATE riwayat_promosi
+                         SET no_sk = ?, tanggal_sk = ?, tanggal_keluar = ?, tujuan = ?, keterangan = ?
+                         WHERE id_promosi = ?'
                     );
-
-                if ($tujuanBerubah && !$terakhir) {
-                    throw new RuntimeException(
-                        'Jabatan/pangkat hanya dapat diubah pada promosi terakhir pegawai.'
-                    );
-                }
-
-                if ($tujuanBerubah) {
-                    $ambilPegawai = $pdo->prepare(
-                        'SELECT id_jabatan, id_pangkat FROM pegawai WHERE id_pegawai = ? FOR UPDATE'
-                    );
-                    $ambilPegawai->execute([(int) $lama['id_pegawai']]);
-                    $pegawai = $ambilPegawai->fetch();
-                    $pangkatSaatIniSesuai = $pegawai
-                        && (
-                            $pegawai['id_pangkat'] === null
-                                ? $lama['id_pangkat_baru'] === null
-                                : (int) $pegawai['id_pangkat'] === (int) $lama['id_pangkat_baru']
+                    $update->execute([
+                        $v['no_sk'],
+                        $v['tanggal_sk'],
+                        $v['tanggal_keluar'],
+                        $v['tujuan'],
+                        $v['keterangan'],
+                        $id,
+                    ]);
+                } else {
+                    $jabatanBaru = (int) $v['id_jabatan_baru'];
+                    $pangkatBaru = $v['id_pangkat_baru'] === ''
+                        ? null
+                        : (int) $v['id_pangkat_baru'];
+                    $tujuanBerubah = $jabatanBaru !== (int) $lama['id_jabatan_baru']
+                        || (
+                            $pangkatBaru === null
+                                ? $lama['id_pangkat_baru'] !== null
+                                : (int) $lama['id_pangkat_baru'] !== $pangkatBaru
                         );
-                    if (
-                        !$pegawai
-                        || (int) $pegawai['id_jabatan'] !== (int) $lama['id_jabatan_baru']
-                        || !$pangkatSaatIniSesuai
-                    ) {
+
+                    if ($tujuanBerubah && !$terakhir) {
                         throw new RuntimeException(
-                            'Jabatan/pangkat pegawai sudah tidak sesuai dengan promosi ini; data pegawai tidak diubah.'
+                            'Jabatan/pangkat hanya dapat diubah pada promosi terakhir pegawai.'
                         );
                     }
-                    $pdo->prepare(
-                        'UPDATE pegawai SET id_jabatan = ?, id_pangkat = ? WHERE id_pegawai = ?'
-                    )->execute([$jabatanBaru, $pangkatBaru, (int) $lama['id_pegawai']]);
-                }
 
-                $update = $pdo->prepare(
-                    'UPDATE riwayat_promosi
-                     SET no_sk = ?, tanggal_sk = ?, id_jabatan_baru = ?, id_pangkat_baru = ?,
-                         tujuan = ?, keterangan = ?
-                     WHERE id_promosi = ?'
-                );
-                $update->execute([
-                    $v['no_sk'],
-                    $v['tanggal_sk'],
-                    $jabatanBaru,
-                    $pangkatBaru,
-                    $v['tujuan'],
-                    $v['keterangan'],
-                    $id,
-                ]);
+                    if ($tujuanBerubah) {
+                        $ambilPegawai = $pdo->prepare(
+                            'SELECT id_jabatan, id_pangkat FROM pegawai WHERE id_pegawai = ? FOR UPDATE'
+                        );
+                        $ambilPegawai->execute([(int) $lama['id_pegawai']]);
+                        $pegawai = $ambilPegawai->fetch();
+                        $pangkatSaatIniSesuai = $pegawai
+                            && (
+                                $pegawai['id_pangkat'] === null
+                                    ? $lama['id_pangkat_baru'] === null
+                                    : (int) $pegawai['id_pangkat'] === (int) $lama['id_pangkat_baru']
+                            );
+                        if (
+                            !$pegawai
+                            || (int) $pegawai['id_jabatan'] !== (int) $lama['id_jabatan_baru']
+                            || !$pangkatSaatIniSesuai
+                        ) {
+                            throw new RuntimeException(
+                                'Jabatan/pangkat pegawai sudah tidak sesuai dengan promosi ini; data pegawai tidak diubah.'
+                            );
+                        }
+                        $pdo->prepare(
+                            'UPDATE pegawai SET id_jabatan = ?, id_pangkat = ? WHERE id_pegawai = ?'
+                        )->execute([$jabatanBaru, $pangkatBaru, (int) $lama['id_pegawai']]);
+                    }
+
+                    $update = $pdo->prepare(
+                        'UPDATE riwayat_promosi
+                         SET no_sk = ?, tanggal_sk = ?, tanggal_keluar = NULL,
+                             id_jabatan_baru = ?, id_pangkat_baru = ?, tujuan = ?, keterangan = ?
+                         WHERE id_promosi = ?'
+                    );
+                    $update->execute([
+                        $v['no_sk'],
+                        $v['tanggal_sk'],
+                        $jabatanBaru,
+                        $pangkatBaru,
+                        $v['tujuan'],
+                        $v['keterangan'],
+                        $id,
+                    ]);
+                }
             } else {
                 $jenisBerubah = $v['jenis_mutasi'] !== $lama['jenis_mutasi'];
                 if ($jenisBerubah && !$terakhir) {
@@ -198,12 +231,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $update = $pdo->prepare(
                     'UPDATE riwayat_mutasi
-                     SET no_sk = ?, tanggal_sk = ?, jenis_mutasi = ?, tujuan = ?, keterangan = ?
+                     SET no_sk = ?, tanggal_sk = ?, tanggal_keluar = ?, jenis_mutasi = ?,
+                         tujuan = ?, keterangan = ?
                      WHERE id_mutasi = ?'
                 );
                 $update->execute([
                     $v['no_sk'],
                     $v['tanggal_sk'],
+                    $v['jenis_mutasi'] === 'Keluar' ? $v['tanggal_keluar'] : null,
                     $v['jenis_mutasi'],
                     $v['tujuan'],
                     $v['keterangan'],
@@ -253,6 +288,17 @@ include 'includes/header.php';
 
         <?php if ($tipe === 'promosi'): ?>
             <label>
+                Jenis promosi
+                <input value="<?= e($v['jenis_promosi']) ?>" readonly>
+                <input type="hidden" name="jenis_promosi" value="<?= e($v['jenis_promosi']) ?>">
+            </label>
+            <?php if ($riwayat['jenis_promosi'] === 'Keluar'): ?>
+                <label>
+                    Tanggal keluar
+                    <input type="date" name="tanggal_keluar" required value="<?= e($v['tanggal_keluar']) ?>">
+                </label>
+            <?php else: ?>
+            <label>
                 Jabatan baru
                 <select name="id_jabatan_baru" required>
                     <option value="">Pilih jabatan</option>
@@ -281,16 +327,23 @@ include 'includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </label>
+            <?php endif; ?>
         <?php else: ?>
             <label>
                 Jenis mutasi
-                <select name="jenis_mutasi" required>
-                    <?php foreach ($jenisMutasiPilihan as $jenis): ?>
-                        <option value="<?= e($jenis) ?>" <?= $v['jenis_mutasi'] === $jenis ? 'selected' : '' ?>>
-                            <?= e($jenis) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <input value="<?= e($v['jenis_mutasi']) ?>" readonly>
+                <input type="hidden" name="jenis_mutasi" value="<?= e($v['jenis_mutasi']) ?>">
+            </label>
+
+            <label id="tanggal-keluar-edit-field" <?= $v['jenis_mutasi'] === 'Keluar' ? '' : 'hidden' ?>>
+                Tanggal keluar
+                <input
+                    type="date"
+                    name="tanggal_keluar"
+                    id="tanggal-keluar-edit"
+                    value="<?= e($v['tanggal_keluar']) ?>"
+                    <?= $v['jenis_mutasi'] === 'Keluar' ? 'required' : 'disabled' ?>
+                >
             </label>
         <?php endif; ?>
 
