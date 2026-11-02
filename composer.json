@@ -1,0 +1,8 @@
+{
+    "name": "simpeg/pn-yogyakarta",
+    "description": "Sistem Informasi Manajemen Kepegawaian PN Yogyakarta",
+    "license": "proprietary",
+    "require": {
+        "dompdf/dompdf": "^3.1"
+    }
+}

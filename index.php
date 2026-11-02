@@ -1,11 +1,19 @@
 <?php
 require_once 'includes/config.php';
+require_once 'includes/riwayat_helpers.php';
 require_login();
+
+$tanggal = $_GET['tanggal'] ?? date('Y-m-d');
+if (!valid_date($tanggal)) {
+    $tanggal = date('Y-m-d');
+}
+$modeHistoris = $tanggal !== date('Y-m-d');
 
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST'
     && csrf_ok()
     && isset($_POST['hapus'])
+    && !$modeHistoris
 ) {
     $pdo->prepare('DELETE FROM pegawai WHERE id_pegawai = ?')
         ->execute([(int) $_POST['hapus']]);
@@ -27,12 +35,6 @@ $filter = [
     'jabatan' => $_GET['jabatan'] ?? '',
     'kelompok' => $_GET['kelompok'] ?? '',
 ];
-$filterColumns = [
-    'golongan' => 'pg.golongan',
-    'pendidikan' => 'p.pendidikan_terakhir',
-    'jabatan' => 'j.nama_jabatan',
-    'kelompok' => 'j.kategori',
-];
 $sortColumns = [
     'nomor' => 'p.id_pegawai',
     'nama' => 'p.nama_lengkap',
@@ -44,9 +46,9 @@ if (!isset($sortColumns[$sort]) || !in_array($arah, ['asc', 'desc'], true)) {
     $sort = '';
     $arah = '';
 }
-$sortUrl = function ($kolom) use ($q, $bln, $filter, $jumlah, $sort, $arah) {
+$sortUrl = function ($kolom) use ($q, $bln, $tanggal, $filter, $jumlah, $sort, $arah) {
     $query = array_merge(
-        ['q' => $q, 'bulan' => $bln],
+        ['q' => $q, 'bulan' => $bln, 'tanggal' => $tanggal],
         $filter,
         ['jumlah' => $jumlah]
     );
@@ -63,82 +65,123 @@ $pangkatList = daftar_pangkat();
 $jabatanList = daftar_jabatan();
 $pendidikanList = daftar_pendidikan();
 $kelompokList = array_values(array_unique(array_column($jabatanList, 'kategori')));
-
-$conditions = [];
-$params = [];
-
-if ($q !== '') {
-    $conditions[] = '(p.nama_lengkap LIKE ? OR p.nip LIKE ?)';
-    $params[] = "%$q%";
-    $params[] = "%$q%";
+$jabatanById = [];
+foreach ($jabatanList as $jabatan) {
+    $jabatanById[(int) $jabatan['id_jabatan']] = $jabatan;
+}
+$pangkatById = [];
+foreach ($pangkatList as $pangkat) {
+    $pangkatById[(int) $pangkat['id_pangkat']] = $pangkat;
 }
 
-if ($bln !== '') {
-    $conditions[] = 'MONTH(p.tmt) = ?';
-    $params[] = (int) $bln;
+$pegawaiTanggal = pegawai_per_tanggal($tanggal);
+foreach ($pegawaiTanggal as &$pegawai) {
+    $jabatan = $jabatanById[(int) $pegawai['id_jabatan']] ?? null;
+    $pangkat = $pegawai['id_pangkat'] === null
+        ? null
+        : ($pangkatById[(int) $pegawai['id_pangkat']] ?? null);
+    $pegawai['jabatan'] = $jabatan['nama_jabatan'] ?? null;
+    $pegawai['kategori'] = $jabatan['kategori'] ?? null;
+    $pegawai['golongan'] = $pangkat['golongan'] ?? null;
+    $pegawai['nama_pangkat'] = $pangkat['nama_pangkat'] ?? null;
+}
+unset($pegawai);
+
+$rows = array_values(array_filter($pegawaiTanggal, static function ($pegawai) use ($q, $bln, $filter) {
+    if ($q !== '' && stripos($pegawai['nama'] . ' ' . $pegawai['nip'], $q) === false) {
+        return false;
+    }
+    if ($bln !== '' && (
+        $pegawai['tmt'] === null
+        || (int) date('n', strtotime($pegawai['tmt'])) !== (int) $bln
+    )) {
+        return false;
+    }
+    return ($filter['golongan'] === '' || $pegawai['golongan'] === $filter['golongan'])
+        && ($filter['pendidikan'] === '' || $pegawai['pendidikan'] === $filter['pendidikan'])
+        && ($filter['jabatan'] === '' || $pegawai['jabatan'] === $filter['jabatan'])
+        && ($filter['kelompok'] === '' || $pegawai['kategori'] === $filter['kelompok']);
+}));
+
+usort($rows, static function ($a, $b) use ($sort, $arah) {
+    if ($sort === 'nomor') {
+        $hasil = (int) $a['id'] <=> (int) $b['id'];
+    } elseif ($sort === 'nama') {
+        $hasil = strcasecmp($a['nama'], $b['nama']);
+    } elseif ($sort === 'jabatan') {
+        $hasil = strcasecmp((string) $a['jabatan'], (string) $b['jabatan']);
+    } else {
+        $hasil = (int) $a['id_jabatan'] <=> (int) $b['id_jabatan'];
+        if ($hasil === 0) {
+            $hasil = strcasecmp($a['nama'], $b['nama']);
+        }
+    }
+    if ($sort !== '' && $arah === 'desc') {
+        $hasil *= -1;
+    }
+    return $hasil !== 0 ? $hasil : ((int) $a['id'] <=> (int) $b['id']);
+});
+$total = count($rows);
+if ($jumlah !== 'semua') {
+    $rows = array_slice($rows, 0, (int) $jumlah);
 }
 
-foreach ($filter as $column => $value) {
-    if ($value !== '') {
-        $conditions[] = $filterColumns[$column] . ' = ?';
-        $params[] = $value;
+$aktif = array_values(array_filter($pegawaiTanggal, static function ($pegawai) {
+    return $pegawai['status'] === 'Aktif';
+}));
+$jumlahKategori = [
+    'Hakim' => 0,
+    'Panitera' => 0,
+    'Juru Sita' => 0,
+    'Kesekretariatan' => 0,
+    'Fungsional/Pelaksana' => 0,
+    'PPNPN' => 0,
+    'Lainnya' => 0,
+];
+foreach ($aktif as $pegawai) {
+    $kategori = $pegawai['kategori'];
+    $namaJabatan = $pegawai['jabatan'] ?? '';
+    if ($kategori === 'Hakim') {
+        $kategoriStat = 'Hakim';
+    } elseif ($kategori === 'PPNPN') {
+        $kategoriStat = 'PPNPN';
+    } elseif (strpos($namaJabatan, 'Panitera') === 0) {
+        $kategoriStat = 'Panitera';
+    } elseif (strpos($namaJabatan, 'Juru Sita') === 0) {
+        $kategoriStat = 'Juru Sita';
+    } elseif ($namaJabatan === 'Sekretaris' || strpos($namaJabatan, 'Kepala Sub Bagian') !== false) {
+        $kategoriStat = 'Kesekretariatan';
+    } elseif ($kategori === 'Pegawai') {
+        $kategoriStat = 'Fungsional/Pelaksana';
+    } else {
+        $kategoriStat = 'Lainnya';
+    }
+    $jumlahKategori[$kategoriStat]++;
+}
+$statsJabatan = [];
+foreach ($jumlahKategori as $kategori => $jumlahKategoriStat) {
+    if ($jumlahKategoriStat > 0) {
+        $statsJabatan[] = ['kategori' => $kategori, 'jumlah' => $jumlahKategoriStat];
     }
 }
-
-$from = ' FROM pegawai p
-    LEFT JOIN jabatan j ON j.id_jabatan = p.id_jabatan
-    LEFT JOIN pangkat_golongan pg ON pg.id_pangkat = p.id_pangkat';
-$where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
-$countStatement = $pdo->prepare('SELECT COUNT(*)' . $from . $where);
-$countStatement->execute($params);
-$total = (int) $countStatement->fetchColumn();
-
-$orderBy = $sort === ''
-    ? 'p.id_jabatan ASC, p.nama_lengkap ASC'
-    : $sortColumns[$sort] . ' ' . strtoupper($arah) . ', p.id_pegawai ASC';
-$sql = 'SELECT
-        p.id_pegawai AS id,
-        p.nama_lengkap AS nama,
-        p.nip,
-        pg.golongan,
-        pg.nama_pangkat,
-        p.pendidikan_terakhir AS pendidikan,
-        j.nama_jabatan AS jabatan,
-        p.tmt,
-        p.status_aktif AS status
-    ' . $from . $where . ' ORDER BY ' . $orderBy
-    . ($jumlah === 'semua' ? '' : ' LIMIT ' . (int) $jumlah);
-$statement = $pdo->prepare($sql);
-$statement->execute($params);
-$rows = $statement->fetchAll();
-
-$stats = $pdo->query(
-    "SELECT
-        (SELECT COUNT(*) FROM pegawai WHERE status_aktif = 'Aktif') AS aktif,
-        (SELECT COUNT(*) FROM pegawai p JOIN jabatan j ON j.id_jabatan = p.id_jabatan
-            WHERE p.status_aktif = 'Aktif' AND j.kategori = 'Hakim') AS hakim,
-        (SELECT COUNT(*) FROM riwayat_promosi) AS promosi,
-        (SELECT COUNT(*) FROM riwayat_mutasi) AS mutasi"
-)->fetch();
-$statsJabatan = $pdo->query(
-    "SELECT CASE
-                WHEN j.kategori = 'Hakim' THEN 'Hakim'
-                WHEN j.kategori = 'PPNPN' THEN 'PPNPN'
-                WHEN j.nama_jabatan LIKE 'Panitera%' THEN 'Panitera'
-                WHEN j.nama_jabatan LIKE 'Juru Sita%' THEN 'Juru Sita'
-                WHEN j.nama_jabatan = 'Sekretaris'
-                  OR j.nama_jabatan LIKE '%Kepala Sub Bagian%' THEN 'Kesekretariatan'
-                WHEN j.kategori = 'Pegawai' THEN 'Fungsional/Pelaksana'
-                ELSE 'Lainnya'
-            END AS kategori,
-            COUNT(p.id_pegawai) AS jumlah
-     FROM pegawai p
-     LEFT JOIN jabatan j ON j.id_jabatan = p.id_jabatan
-     WHERE p.status_aktif = 'Aktif'
-     GROUP BY 1
-     ORDER BY FIELD(kategori, 'Hakim', 'Panitera', 'Juru Sita', 'Kesekretariatan',
-                    'Fungsional/Pelaksana', 'PPNPN', 'Lainnya')"
-)->fetchAll();
+$countPromosi = $pdo->prepare(
+    "SELECT COUNT(*) FROM riwayat_promosi
+     WHERE (CASE WHEN jenis_promosi = 'Keluar' AND tanggal_keluar IS NOT NULL
+                 THEN tanggal_keluar ELSE tanggal_sk END) <= ?"
+);
+$countPromosi->execute([$tanggal]);
+$countMutasi = $pdo->prepare(
+    "SELECT COUNT(*) FROM riwayat_mutasi
+     WHERE (CASE WHEN jenis_mutasi = 'Keluar' AND tanggal_keluar IS NOT NULL
+                 THEN tanggal_keluar ELSE tanggal_sk END) <= ?"
+);
+$countMutasi->execute([$tanggal]);
+$stats = [
+    'aktif' => count($aktif),
+    'hakim' => $jumlahKategori['Hakim'],
+    'promosi' => (int) $countPromosi->fetchColumn(),
+    'mutasi' => (int) $countMutasi->fetchColumn(),
+];
 
 $judul = 'Daftar pegawai';
 include 'includes/header.php';
@@ -180,6 +223,11 @@ include 'includes/header.php';
         <label>
             Nama atau NIP
             <input name="q" value="<?= e($q) ?>" placeholder="Ketik nama / NIP">
+        </label>
+
+        <label>
+            Kondisi per tanggal
+            <input type="date" name="tanggal" value="<?= e($tanggal) ?>" required>
         </label>
 
         <label>
@@ -274,13 +322,15 @@ include 'includes/header.php';
                             <th><?= e($judulKolom) ?></th>
                         <?php endif; ?>
                     <?php endforeach; ?>
-                    <th></th>
+                    <?php if (!$modeHistoris): ?>
+                        <th></th>
+                    <?php endif; ?>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$rows): ?>
                     <tr>
-                        <td colspan="9" class="em">
+                        <td colspan="<?= $modeHistoris ? 8 : 9 ?>" class="em">
                             Tidak ada pegawai yang cocok. Ubah atau kosongkan filter.
                         </td>
                     </tr>
@@ -303,21 +353,23 @@ include 'includes/header.php';
                                 <?= e($row['status']) ?>
                             </span>
                         </td>
-                        <td>
-                            <div class="row-actions">
-                                <a class="btn edit" href="edit.php?id=<?= (int) $row['id'] ?>">Edit</a>
-                                <form
-                                    method="post"
-                                    data-confirm-title="Yakin ingin menghapus data pegawai?"
-                                    data-confirm-message="Data pegawai beserta riwayatnya akan dihapus."
-                                    data-confirm-button="Ya, Hapus"
-                                >
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="hapus" value="<?= $row['id'] ?>">
-                                    <button class="btn g" type="submit">Hapus</button>
-                                </form>
-                            </div>
-                        </td>
+                        <?php if (!$modeHistoris): ?>
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn edit" href="edit.php?id=<?= (int) $row['id'] ?>">Edit</a>
+                                    <form
+                                        method="post"
+                                        data-confirm-title="Yakin ingin menghapus data pegawai?"
+                                        data-confirm-message="Data pegawai beserta riwayatnya akan dihapus."
+                                        data-confirm-button="Ya, Hapus"
+                                    >
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="hapus" value="<?= $row['id'] ?>">
+                                        <button class="btn g" type="submit">Hapus</button>
+                                    </form>
+                                </div>
+                            </td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

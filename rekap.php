@@ -321,6 +321,13 @@ include 'includes/header.php';
         <div>
             <br>
             <button class="btn" type="submit">Terapkan</button>
+            <a
+                class="btn g"
+                href="cetak_rekap.php?<?= e(http_build_query([
+                    'tipe' => $tipe,
+                    'tahun' => $tahun !== '' ? $tahun : date('Y'),
+                ])) ?>"
+            >Unduh PDF tahunan</a>
             <a class="btn g" style="color:var(--mu)" href="rekap.php?tipe=<?= e($tipe) ?>">Reset</a>
         </div>
     </form>

@@ -149,3 +149,4 @@ input.auth-input:focus{outline:0;border-color:var(--pn-green);background:#fff;bo
 input.auth-input-plain{height:46px;padding:8px 13px}
 @media(max-width:520px){.auth-screen{padding:16px;background-attachment:scroll}.auth-container{width:100%;padding:28px 24px}.auth-brand img{height:78px}.auth-brand h1{font-size:2rem}.auth-brand p{font-size:.9rem}.auth-input{font-size:15px}}
 @media(max-height:720px){.auth-container{padding-top:20px;padding-bottom:20px}.auth-brand{margin-bottom:16px}.auth-brand img{height:70px;margin-bottom:5px}.auth-brand h1{font-size:1.8rem}.auth-brand p{margin-top:5px;font-size:.85rem}.auth-form{gap:10px}.auth-submit{min-height:50px;font-size:16px}.auth-footer{margin-top:12px;font-size:12px}}
+
