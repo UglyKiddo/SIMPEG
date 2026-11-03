@@ -1,7 +1,7 @@
         </main>
 
         <footer class="app-footer">
-            <strong>SIMPEG - Sistem Informasi Manajemen Kepegawaian · Pengadilan Negeri Yogyakarta</strong>
+            <strong>SI Kepegawaian · Pengadilan Negeri Yogyakarta</strong>
             <span>© <?= date('Y') ?> Pengadilan Negeri Yogyakarta</span>
         </footer>
     </div>

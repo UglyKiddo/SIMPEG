@@ -12,7 +12,8 @@ if (!$tahun || $tahun < 1900 || $tahun > 2150) {
 
 if ($tipe === 'promosi') {
     $tanggalEfektif = "CASE WHEN r.jenis_promosi = 'Keluar' AND r.tanggal_keluar IS NOT NULL
-                             THEN r.tanggal_keluar ELSE r.tanggal_sk END";
+                             THEN r.tanggal_keluar
+                             ELSE COALESCE(r.tanggal_melaksanakan, r.tanggal_sk) END";
     $sql = 'SELECT r.id_promosi AS id, r.no_sk, r.jenis_promosi AS jenis,
                    ' . $tanggalEfektif . ' AS tanggal_efektif,
                    COALESCE(p.nama_lengkap, r.nama_pegawai, CONCAT(\'Pegawai #\', r.id_pegawai)) AS nama,
@@ -81,7 +82,7 @@ ob_start();
         <thead>
             <tr>
                 <th>Bulan</th>
-                <th>Tanggal</th>
+                <th><?= $tipe === 'promosi' ? 'Tanggal efektif' : 'Tanggal' ?></th>
                 <th>Nama / NIP</th>
                 <th>Jenis perubahan</th>
                 <th>Rincian</th>

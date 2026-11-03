@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tmtPegawaiBaru = trim($_POST['tmt_pegawai_baru'] ?? '');
     $noSk = trim($_POST['no_sk'] ?? '');
     $tanggalSk = $_POST['tanggal_sk'] ?? '';
+    $tanggalMelaksanakan = trim($_POST['tanggal_melaksanakan'] ?? '');
     $tanggalKeluar = trim($_POST['tanggal_keluar'] ?? '');
     $tujuan = trim($_POST['tujuan'] ?? '');
     $keterangan = trim($_POST['keterangan'] ?? '');
@@ -199,6 +200,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             && $jenisPromosi === 'Keluar'
             && !valid_date($tanggalKeluar)
         )
+        || (
+            $tipe === 'promosi'
+            && $jenisPromosi === 'Naik Jabatan'
+            && !valid_date($tanggalMelaksanakan)
+        )
     ) {
         flash('Nomor SK, tanggal SK, tanggal keluar, tujuan, atau keterangan tidak valid.', true);
     } elseif (
@@ -315,10 +321,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $insert = $pdo->prepare(
                     'INSERT INTO riwayat_promosi
-                        (id_pegawai, nama_pegawai, nip_pegawai, jenis_promosi, no_sk, tanggal_sk,
+                        (id_pegawai, nama_pegawai, nip_pegawai, jenis_promosi, no_sk, tanggal_sk, tanggal_melaksanakan,
                          tanggal_keluar, id_jabatan_lama, id_pangkat_lama, id_jabatan_baru,
                          id_pangkat_baru, tujuan, keterangan)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                 );
                 $jabatanBaru = $jenisPromosi === 'Keluar'
                     ? (int) $pegawai['id_jabatan']
@@ -333,6 +339,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $jenisPromosi,
                     $noSk,
                     $tanggalSk,
+                    $jenisPromosi === 'Naik Jabatan' ? $tanggalMelaksanakan : null,
                     $jenisPromosi === 'Keluar' ? $tanggalKeluar : null,
                     $pegawai['id_jabatan'],
                     $pegawai['id_pangkat'],
@@ -688,6 +695,17 @@ include 'includes/header.php';
         </label>
 
         <label class="promotion-field" hidden>
+            Tanggal melaksanakan
+            <input
+                type="date"
+                name="tanggal_melaksanakan"
+                id="tanggal-melaksanakan"
+                value="<?= e($_POST['tanggal_melaksanakan'] ?? '') ?>"
+                disabled
+            >
+        </label>
+
+        <label class="promotion-field" hidden>
             Jabatan lama
             <input id="jabatan-lama" readonly disabled>
         </label>
@@ -776,6 +794,7 @@ include 'includes/header.php';
     const jenisPromosi = document.getElementById('jenis-promosi');
     const tanggalKeluarField = document.getElementById('tanggal-keluar-field');
     const tanggalKeluarInput = document.getElementById('tanggal-keluar');
+    const tanggalMelaksanakanInput = document.getElementById('tanggal-melaksanakan');
     const pegawaiSelect = document.getElementById('pegawai');
     const pendidikanPegawaiBaru = document.getElementById('pendidikan-pegawai-baru');
     const pendidikanLainnyaField = document.querySelector('.new-employee-other-field');
@@ -824,6 +843,7 @@ include 'includes/header.php';
                 control.disabled = !promosiNaikJabatan;
             }
         });
+        tanggalMelaksanakanInput.required = promosiNaikJabatan;
         document.querySelectorAll('.mutation-field').forEach((field) => {
             field.hidden = promosi;
             const control = field.querySelector('select, input');

@@ -67,16 +67,33 @@ function pegawai_per_tanggal($tanggal)
         ];
     }
 
+    $snapshot = $pdo->prepare(
+        'SELECT id_pegawai AS id, nip, nama_lengkap AS nama, id_jabatan, id_pangkat,
+                pendidikan_terakhir AS pendidikan, tmt, status_aktif AS status
+         FROM riwayat_edit_pegawai
+        WHERE tanggal_perubahan > ?
+        ORDER BY id_pegawai, tanggal_perubahan, id_riwayat'
+    );
+    $snapshot->execute([$tanggal]);
+    $snapshotDiterapkan = [];
+    foreach ($snapshot->fetchAll() as $row) {
+        $id = (int) $row['id'];
+        if (isset($pegawai[$id]) && !isset($snapshotDiterapkan[$id])) {
+            $pegawai[$id] = $row;
+            $snapshotDiterapkan[$id] = true;
+        }
+    }
+
     $perubahan = [];
     foreach ($pdo->query(
-        'SELECT id_pegawai, jenis_promosi AS jenis, tanggal_sk, tanggal_keluar,
+        'SELECT id_pegawai, jenis_promosi AS jenis, tanggal_sk, tanggal_melaksanakan, tanggal_keluar,
                 id_jabatan_lama, id_pangkat_lama, created_at, id_promosi AS id_transaksi,
                 \'promosi\' AS tipe
          FROM riwayat_promosi'
     )->fetchAll() as $row) {
         $row['tanggal_efektif'] = $row['jenis'] === 'Keluar' && $row['tanggal_keluar']
             ? $row['tanggal_keluar']
-            : $row['tanggal_sk'];
+            : ($row['tanggal_melaksanakan'] ?? $row['tanggal_sk']);
         $perubahan[] = $row;
     }
     foreach ($pdo->query(

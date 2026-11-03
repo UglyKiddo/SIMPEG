@@ -126,6 +126,25 @@ if ($jumlah !== 'semua') {
     $rows = array_slice($rows, 0, (int) $jumlah);
 }
 
+$formatUnduh = $_GET['unduh'] ?? '';
+if (in_array($formatUnduh, ['doc', 'xls'], true)) {
+    require_once 'includes/pegawai_export.php';
+    unduh_data_pegawai($rows, $tanggal, $formatUnduh);
+    exit;
+}
+
+$parameterUnduh = array_merge(
+    ['tanggal' => $tanggal, 'q' => $q, 'bulan' => $bln],
+    $filter,
+    ['jumlah' => $jumlah]
+);
+if ($sort !== '') {
+    $parameterUnduh['sort'] = $sort;
+    $parameterUnduh['arah'] = $arah;
+}
+$urlUnduhWord = 'index.php?' . http_build_query(array_merge($parameterUnduh, ['unduh' => 'doc']));
+$urlUnduhExcel = 'index.php?' . http_build_query(array_merge($parameterUnduh, ['unduh' => 'xls']));
+
 $aktif = array_values(array_filter($pegawaiTanggal, static function ($pegawai) {
     return $pegawai['status'] === 'Aktif';
 }));
@@ -289,6 +308,18 @@ include 'includes/header.php';
             <a class="btn g" style="color:var(--mu)" href="index.php">Reset</a>
         </div>
     </form>
+
+    <div class="row-actions" style="margin-top:16px">
+        <a class="btn" href="<?= e($urlUnduhWord) ?>">Unduh Word</a>
+        <a class="btn" href="<?= e($urlUnduhExcel) ?>">Unduh Excel</a>
+    </div>
+
+    <?php if ($modeHistoris): ?>
+        <p class="em">
+            Riwayat perubahan melalui edit tersedia mulai setelah migrasi riwayat edit dipasang.
+            Perubahan sebelum migrasi tidak dapat dipulihkan otomatis.
+        </p>
+    <?php endif; ?>
 
     <div class="cnt"><?= count($rows) ?> dari <?= $total ?> data hasil pencarian ditampilkan</div>
 

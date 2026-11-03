@@ -79,6 +79,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Tanggal TMT tidak valid.', true);
     } else {
         try {
+            $nilaiBaru = [
+                'nip' => $v['nip'],
+                'nama_lengkap' => $v['nama'],
+                'id_jabatan' => (int) $v['id_jabatan'],
+                'id_pangkat' => $v['id_pangkat'] === '' ? null : (int) $v['id_pangkat'],
+                'pendidikan_terakhir' => $v['pendidikan'],
+                'tmt' => $v['tmt'] === '' ? null : $v['tmt'],
+                'status_aktif' => $v['status'],
+            ];
+            $pdo->beginTransaction();
+            $currentStatement = $pdo->prepare(
+                'SELECT nip, nama_lengkap, id_jabatan, id_pangkat, pendidikan_terakhir, tmt, status_aktif
+                 FROM pegawai
+                 WHERE id_pegawai = ?
+                 FOR UPDATE'
+            );
+            $currentStatement->execute([$idPegawai]);
+            $current = $currentStatement->fetch();
+            if (!$current) {
+                $pdo->rollBack();
+                http_response_code(404);
+                exit('Data pegawai tidak ditemukan.');
+            }
+
+            $berubah = false;
+            foreach ($nilaiBaru as $kolom => $nilai) {
+                $nilaiLama = $current[$kolom];
+                if (in_array($kolom, ['id_jabatan', 'id_pangkat'], true)) {
+                    $nilaiLama = $nilaiLama === null ? null : (int) $nilaiLama;
+                }
+                if ($nilaiLama !== $nilai) {
+                    $berubah = true;
+                    break;
+                }
+            }
+            if ($berubah) {
+                $snapshot = $pdo->prepare(
+                    'INSERT INTO riwayat_edit_pegawai
+                        (id_pegawai, nip, nama_lengkap, id_jabatan, id_pangkat,
+                         pendidikan_terakhir, tmt, status_aktif, tanggal_perubahan)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                $snapshot->execute([
+                    $idPegawai,
+                    $current['nip'],
+                    $current['nama_lengkap'],
+                    $current['id_jabatan'],
+                    $current['id_pangkat'],
+                    $current['pendidikan_terakhir'],
+                    $current['tmt'],
+                    $current['status_aktif'],
+                    date('Y-m-d'),
+                ]);
+            }
+
             $update = $pdo->prepare(
                 'UPDATE pegawai
                  SET nip = ?, nama_lengkap = ?, id_jabatan = ?, id_pangkat = ?,
@@ -86,20 +141,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  WHERE id_pegawai = ?'
             );
             $update->execute([
-                $v['nip'],
-                $v['nama'],
-                (int) $v['id_jabatan'],
-                $v['id_pangkat'] === '' ? null : (int) $v['id_pangkat'],
-                $v['pendidikan'],
-                $v['tmt'] === '' ? null : $v['tmt'],
-                $v['status'],
+                $nilaiBaru['nip'],
+                $nilaiBaru['nama_lengkap'],
+                $nilaiBaru['id_jabatan'],
+                $nilaiBaru['id_pangkat'],
+                $nilaiBaru['pendidikan_terakhir'],
+                $nilaiBaru['tmt'],
+                $nilaiBaru['status_aktif'],
                 $idPegawai,
             ]);
+            $pdo->commit();
 
             flash('Data pegawai berhasil diperbarui.');
             header('Location: index.php');
             exit;
         } catch (PDOException $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             if ($exception->getCode() === '23000') {
                 flash('NIP tersebut sudah digunakan pegawai lain.', true);
             } else {

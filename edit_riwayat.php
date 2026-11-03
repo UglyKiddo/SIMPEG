@@ -34,6 +34,7 @@ $jenisPromosiPilihan = ['Naik Jabatan', 'Keluar'];
 $v = [
     'no_sk' => $riwayat['no_sk'] ?? '',
     'tanggal_sk' => $riwayat['tanggal_sk'] ?? '',
+    'tanggal_melaksanakan' => $riwayat['tanggal_melaksanakan'] ?? '',
     'tanggal_keluar' => $riwayat['tanggal_keluar'] ?? '',
     'jenis_promosi' => $riwayat['jenis_promosi'] ?? 'Naik Jabatan',
     'tujuan' => $riwayat['tujuan'] ?? '',
@@ -69,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         && (
             ($tipe !== 'mutasi' || $v['jenis_mutasi'] !== 'Keluar' || valid_date($v['tanggal_keluar']))
             && ($tipe !== 'promosi' || $v['jenis_promosi'] !== 'Keluar' || valid_date($v['tanggal_keluar']))
+            && ($tipe !== 'promosi' || $v['jenis_promosi'] !== 'Naik Jabatan' || valid_date($v['tanggal_melaksanakan']))
         )
         && $v['tujuan'] !== ''
         && mb_strlen($v['tujuan']) <= 255
@@ -165,13 +167,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $update = $pdo->prepare(
                         'UPDATE riwayat_promosi
-                         SET no_sk = ?, tanggal_sk = ?, tanggal_keluar = NULL,
+                         SET no_sk = ?, tanggal_sk = ?, tanggal_melaksanakan = ?, tanggal_keluar = NULL,
                              id_jabatan_baru = ?, id_pangkat_baru = ?, tujuan = ?, keterangan = ?
                          WHERE id_promosi = ?'
                     );
                     $update->execute([
                         $v['no_sk'],
                         $v['tanggal_sk'],
+                        $v['tanggal_melaksanakan'],
                         $jabatanBaru,
                         $pangkatBaru,
                         $v['tujuan'],
@@ -298,6 +301,16 @@ include 'includes/header.php';
                     <input type="date" name="tanggal_keluar" required value="<?= e($v['tanggal_keluar']) ?>">
                 </label>
             <?php else: ?>
+            <label>
+                Tanggal melaksanakan
+                <input
+                    type="date"
+                    name="tanggal_melaksanakan"
+                    required
+                    value="<?= e($v['tanggal_melaksanakan']) ?>"
+                >
+            </label>
+
             <label>
                 Jabatan baru
                 <select name="id_jabatan_baru" required>

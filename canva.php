@@ -99,7 +99,7 @@ include 'includes/header.php';
 <section class="card canva-settings" aria-labelledby="canva-settings-title">
     <h2 id="canva-settings-title">Hubungkan presentasi Canva</h2>
     <p class="sub">
-        Tempel tautan tampilan presentasi Canva. Presentasi harus dapat diakses oleh pengguna yang membuka SIMPEG.
+        Tempel tautan tampilan presentasi Canva. Presentasi harus dapat diakses oleh pengguna SI Kepegawaian.
     </p>
 
     <?php if ($gagalMembacaPengaturan): ?>
@@ -143,7 +143,7 @@ include 'includes/header.php';
         <div class="canva-presentation-heading">
             <div>
                 <h2>Presentasi data pegawai</h2>
-                <p class="sub">Konten mengikuti presentasi yang dikelola di Canva dan tidak tersinkron otomatis dari database SIMPEG.</p>
+                <p class="sub">Konten mengikuti presentasi yang dikelola di Canva dan tidak tersinkron otomatis dari database SI Kepegawaian.</p>
             </div>
             <a class="btn canva-open" href="<?= e($urlCanva) ?>" target="_blank" rel="noopener noreferrer">
                 Buka di Canva

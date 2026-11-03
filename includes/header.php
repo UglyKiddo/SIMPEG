@@ -35,7 +35,7 @@ function nav($url, $label, $icon, $active)
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= e($judul ?? 'Dashboard') ?> - SIMPEG PN Yogyakarta</title>
+    <title><?= e($judul ?? 'Dashboard') ?> - SI Kepegawaian PN Yogyakarta</title>
     <link rel="icon" type="image/png" href="assets/img/logo.png">
     <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -43,7 +43,7 @@ function nav($url, $label, $icon, $active)
     <aside class="sidebar">
         <a class="sidebar-brand" href="index.php">
             <img src="assets/img/logo.png" alt="">
-            <span><strong>SIMPEG</strong><small>PNYK</small></span>
+            <span><strong>SI Kepegawaian</strong><small>PNYK</small></span>
         </a>
 
         <div class="side-section">

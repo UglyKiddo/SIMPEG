@@ -69,7 +69,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Setup Akun - SIMPEG PN Yogyakarta</title>
+    <title>Setup Akun - SI Kepegawaian PN Yogyakarta</title>
     <link rel="icon" type="image/png" href="assets/img/logo.png">
     <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -79,8 +79,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 
         <header class="auth-brand">
             <img src="assets/img/logo.png" alt="Logo Pengadilan Negeri Yogyakarta">
-            <h1>SIMPEG</h1>
-            <p>Sistem Informasi Manajemen Kepegawaian<br>Pengadilan Negeri Yogyakarta</p>
+            <h1>SI Kepegawaian</h1>
+            <p>Sistem Informasi Kepegawaian<br>Pengadilan Negeri Yogyakarta</p>
         </header>
 
         <h2 class="auth-title">Buat Akun Pengelola</h2>

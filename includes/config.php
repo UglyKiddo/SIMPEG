@@ -1,5 +1,6 @@
 <?php
 // Sesuaikan dengan server MySQL Anda (XAMPP default: root tanpa password)
+date_default_timezone_set('Asia/Jakarta');
 $DB = ['host'=>'localhost','name'=>'pn_yogya','user'=>'root','pass'=>''];
 session_name('SIMPEG_PN_YOGYAKARTA');
 ini_set('session.use_strict_mode', '1');

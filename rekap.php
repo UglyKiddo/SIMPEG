@@ -158,6 +158,7 @@ $params = [];
 
 if ($tipe === 'promosi') {
     $sql = 'SELECT r.id_promosi AS id, r.id_pegawai, r.jenis_promosi, r.tanggal_keluar,
+                r.tanggal_melaksanakan,
                 r.no_sk, r.tanggal_sk, r.tujuan, r.keterangan,
                 COALESCE(p.nama_lengkap, r.nama_pegawai, CONCAT(\'Pegawai #\', r.id_pegawai)) AS nama,
                 COALESCE(p.nip, r.nip_pegawai, \'-\') AS nip,
@@ -344,7 +345,8 @@ include 'includes/header.php';
                     <th>Nama</th>
                     <?php if ($isPromosi): ?>
                         <th>Nomor SK</th>
-                        <th>Hari/tanggal</th>
+                        <th>Tanggal SK</th>
+                        <th>Tanggal melaksanakan</th>
                         <th>Jabatan lama</th>
                         <th>Jabatan baru</th>
                         <th>Tujuan</th>
@@ -365,7 +367,7 @@ include 'includes/header.php';
             <tbody>
                 <?php if (!$rows): ?>
                     <tr>
-                        <td colspan="<?= $isPromosi ? 10 : 11 ?>" class="em">
+                        <td colspan="11" class="em">
                             Belum ada data<?= $labelPeriode !== '' ? ' untuk ' . e($labelPeriode) : '' ?>.
                         </td>
                     </tr>
@@ -381,6 +383,11 @@ include 'includes/header.php';
                         <?php if ($isPromosi): ?>
                             <td><?= e($row['no_sk']) ?></td>
                             <td><?= e(tgl_id($row['tanggal_sk'])) ?></td>
+                            <td>
+                                <?= $row['jenis_promosi'] === 'Naik Jabatan'
+                                    ? e(tgl_id($row['tanggal_melaksanakan']))
+                                    : '-' ?>
+                            </td>
                             <td>
                                 <?= e($row['golongan_lama'] ?? '-') ?>
                                 <div class="sub"><?= e($row['jabatan_lama'] ?? '-') ?></div>

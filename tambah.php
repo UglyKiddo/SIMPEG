@@ -8,10 +8,13 @@ $pendidikanList = array_values(array_diff(daftar_pendidikan(), ['Lainnya']));
 $pilihanLainnya = '__pendidikan_lainnya__';
 $pendidikanLainnya = '';
 $tampilkanPendidikanLainnya = false;
+$kategoriJabatanList = ['Hakim', 'Pegawai', 'PPNPN'];
+$kategoriJabatan = '';
+$tampilkanKategoriJabatan = false;
 $v = [
     'nama' => '',
     'nip' => '',
-    'id_jabatan' => '',
+    'jabatan' => '',
     'id_pangkat' => '',
     'pendidikan' => 'S1',
     'tmt' => date('Y-m-d'),
@@ -22,18 +25,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $v[$key] = trim($_POST[$key] ?? '');
     }
     $pendidikanLainnya = trim($_POST['pendidikan_lainnya'] ?? '');
+    $kategoriJabatan = trim($_POST['kategori_jabatan'] ?? '');
     $tampilkanPendidikanLainnya = $v['pendidikan'] === $pilihanLainnya;
     $pendidikanTersimpan = $tampilkanPendidikanLainnya
         ? $pendidikanLainnya
         : $v['pendidikan'];
 
-    $jabatanValid = false;
+    $jabatanDitemukan = null;
     foreach ($jabatanList as $jabatan) {
-        if ((string) $jabatan['id_jabatan'] === $v['id_jabatan']) {
-            $jabatanValid = true;
+        if (mb_strtolower($jabatan['nama_jabatan']) === mb_strtolower($v['jabatan'])) {
+            $jabatanDitemukan = $jabatan;
             break;
         }
     }
+    $tampilkanKategoriJabatan = $jabatanDitemukan === null;
+    $jabatanValid = $v['jabatan'] !== ''
+        && mb_strlen($v['jabatan']) <= 150
+        && (
+            $jabatanDitemukan !== null
+            || in_array($kategoriJabatan, $kategoriJabatanList, true)
+        );
 
     $pangkatValid = false;
     foreach ($pangkatList as $pangkat) {
@@ -66,6 +77,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Tanggal TMT tidak valid.', true);
     } else {
         try {
+            $pdo->beginTransaction();
+            if ($jabatanDitemukan !== null) {
+                $idJabatan = (int) $jabatanDitemukan['id_jabatan'];
+            } else {
+                $insertJabatan = $pdo->prepare(
+                    'INSERT INTO jabatan (nama_jabatan, kategori) VALUES (?, ?)'
+                );
+                $insertJabatan->execute([$v['jabatan'], $kategoriJabatan]);
+                $idJabatan = (int) $pdo->lastInsertId();
+            }
+
             $statement = $pdo->prepare(
                 'INSERT INTO pegawai
                     (nip, nama_lengkap, id_jabatan, id_pangkat, pendidikan_terakhir, status_aktif, tmt, dibuat_oleh)
@@ -74,17 +96,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $statement->execute([
                 $v['nip'],
                 $v['nama'],
-                (int) $v['id_jabatan'],
+                $idJabatan,
                 (int) $v['id_pangkat'],
                 $pendidikanTersimpan,
                 $v['tmt'],
                 (int) $_SESSION['id_user'],
             ]);
+            $pdo->commit();
 
             flash('Pegawai baru disimpan.');
             header('Location: index.php');
             exit;
         } catch (PDOException $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             flash(
                 $exception->getCode() === '23000'
                     ? 'NIP ' . $v['nip'] . ' sudah terdaftar.'
@@ -125,14 +151,32 @@ include 'includes/header.php';
 
         <label>
             Jabatan
-            <select name="id_jabatan" required>
-                <option value="">Pilih jabatan</option>
+            <input
+                name="jabatan"
+                required
+                maxlength="150"
+                list="daftar-jabatan"
+                value="<?= e($v['jabatan']) ?>"
+                placeholder="Pilih atau ketik jabatan"
+            >
+            <datalist id="daftar-jabatan">
                 <?php foreach ($jabatanList as $jabatan): ?>
-                    <option
-                        value="<?= (int) $jabatan['id_jabatan'] ?>"
-                        <?= (string) $jabatan['id_jabatan'] === $v['id_jabatan'] ? 'selected' : '' ?>
-                    >
-                        <?= e($jabatan['nama_jabatan']) ?> (<?= e($jabatan['kategori']) ?>)
+                    <option value="<?= e($jabatan['nama_jabatan']) ?>">
+                <?php endforeach; ?>
+            </datalist>
+        </label>
+
+        <label id="kategori-jabatan-field" <?= $tampilkanKategoriJabatan ? '' : 'hidden' ?>>
+            Kategori jabatan baru
+            <select
+                name="kategori_jabatan"
+                id="kategori-jabatan"
+                <?= $tampilkanKategoriJabatan ? 'required' : 'disabled' ?>
+            >
+                <option value="">Pilih kategori</option>
+                <?php foreach ($kategoriJabatanList as $kategori): ?>
+                    <option value="<?= e($kategori) ?>" <?= $kategoriJabatan === $kategori ? 'selected' : '' ?>>
+                        <?= e($kategori) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -194,6 +238,25 @@ include 'includes/header.php';
 </div>
 
 <script>
+    const jabatanInput = document.querySelector('[name="jabatan"]');
+    const daftarJabatan = <?= json_encode(
+        array_column($jabatanList, 'nama_jabatan'),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ) ?>;
+    const kategoriJabatanField = document.getElementById('kategori-jabatan-field');
+    const kategoriJabatanSelect = document.getElementById('kategori-jabatan');
+
+    function perbaruiKategoriJabatan() {
+        const namaJabatan = jabatanInput.value.trim().toLocaleLowerCase();
+        const sudahTerdaftar = daftarJabatan.some(
+            (nama) => nama.toLocaleLowerCase() === namaJabatan
+        );
+        const jabatanBaru = namaJabatan !== '' && !sudahTerdaftar;
+        kategoriJabatanField.hidden = !jabatanBaru;
+        kategoriJabatanSelect.disabled = !jabatanBaru;
+        kategoriJabatanSelect.required = jabatanBaru;
+    }
+
     const pendidikanSelect = document.querySelector('[name="pendidikan"]');
     const pendidikanLainnyaField = document.getElementById('pendidikan-lainnya-field');
     const pendidikanLainnyaInput = document.getElementById('pendidikan-lainnya');
@@ -206,6 +269,8 @@ include 'includes/header.php';
         pendidikanLainnyaInput.required = tampilkan;
     }
 
+    jabatanInput.addEventListener('input', perbaruiKategoriJabatan);
+    perbaruiKategoriJabatan();
     pendidikanSelect.addEventListener('change', perbaruiPendidikanLainnya);
 </script>
 
